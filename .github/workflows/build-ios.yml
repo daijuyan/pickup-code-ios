@@ -22,42 +22,26 @@ jobs:
         run: npm install
 
       - name: Generate native iOS project
-        run: npx expo prebuild --platform ios --clean
+        run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: List ios directory
-        run: ls -la ios/
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
 
       - name: Build unsigned .app
         run: |
           cd ios
-          # Find workspace or project
-          if ls -d *.xcworkspace 2>/dev/null; then
-            WS=$(ls -d *.xcworkspace | head -1)
-            echo "Using workspace: $WS"
-            xcodebuild \
-              -workspace "$WS" \
-              -scheme "$(ls -d *.xcodeproj | head -1 | sed 's/.xcodeproj//')" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -derivedDataPath build \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY="" \
-              DEVELOPMENT_TEAM=""
-          else
-            PROJ=$(ls -d *.xcodeproj | head -1)
-            echo "Using project: $PROJ"
-            xcodebuild \
-              -project "$PROJ" \
-              -scheme "$(echo $PROJ | sed 's/.xcodeproj//')" \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -derivedDataPath build \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY="" \
-              DEVELOPMENT_TEAM=""
-          fi
+          xcodebuild \
+            -workspace app.xcworkspace \
+            -scheme app \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
 
       - name: Package IPA
         run: |
