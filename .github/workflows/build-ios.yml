@@ -24,56 +24,40 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Detect workspace and scheme
-        id: detect
-        run: |
-          cd ios
-          WORKSPACE=$(ls *.xcworkspace 2>/dev/null | head -1)
-          if [ -z "$WORKSPACE" ]; then
-            XCPROJ=$(ls *.xcodeproj 2>/dev/null | head -1)
-            SCHEME=$(xcodebuild -project "$XCPROJ" -list -json 2>/dev/null | python3 -c "
-            import json,sys
-            d=json.load(sys.stdin)
-            schemes=d.get('project',{}).get('schemes',[])
-            print(schemes[0] if schemes else 'app')
-            " 2>/dev/null || echo "app")
-            echo "use_workspace=false" >> $GITHUB_OUTPUT
-            echo "project=$XCPROJ" >> $GITHUB_OUTPUT
-            echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
-            echo "Project: $XCPROJ, Scheme: $SCHEME"
-          else
-            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json 2>/dev/null | python3 -c "
-            import json,sys
-            d=json.load(sys.stdin)
-            schemes=d.get('workspace',{}).get('schemes',[])
-            print(schemes[0] if schemes else 'app')
-            " 2>/dev/null || echo "app")
-            echo "use_workspace=true" >> $GITHUB_OUTPUT
-            echo "workspace=$WORKSPACE" >> $GITHUB_OUTPUT
-            echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
-            echo "Workspace: $WORKSPACE, Scheme: $SCHEME"
-          fi
+      - name: List ios directory
+        run: ls -la ios/
 
       - name: Build unsigned .app
         run: |
-          if [ "${{ steps.detect.outputs.use_workspace }}" = "true" ]; then
-            BUILD_FLAG="-workspace ios/${{ steps.detect.outputs.workspace }}"
+          cd ios
+          # Find workspace or project
+          if ls -d *.xcworkspace 2>/dev/null; then
+            WS=$(ls -d *.xcworkspace | head -1)
+            echo "Using workspace: $WS"
+            xcodebuild \
+              -workspace "$WS" \
+              -scheme "$(ls -d *.xcodeproj | head -1 | sed 's/.xcodeproj//')" \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath build \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM=""
           else
-            BUILD_FLAG="-project ios/${{ steps.detect.outputs.project }}"
+            PROJ=$(ls -d *.xcodeproj | head -1)
+            echo "Using project: $PROJ"
+            xcodebuild \
+              -project "$PROJ" \
+              -scheme "$(echo $PROJ | sed 's/.xcodeproj//')" \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath build \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM=""
           fi
-          xcodebuild \
-            $BUILD_FLAG \
-            -scheme "${{ steps.detect.outputs.scheme }}" \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath ios/build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            ENABLE_BITCODE=NO \
-            DEVELOPMENT_TEAM=""
 
       - name: Package IPA
         run: |
