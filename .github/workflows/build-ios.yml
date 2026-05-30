@@ -29,27 +29,6 @@ jobs:
           cd ios
           pod install
 
-      - name: Patch Pods Swift settings
-        run: |
-          # Patch xcconfig files: set Swift version and disable strict concurrency
-          find ios/Pods/Target\ Support\ Files -name "*.xcconfig" | while read f; do
-            sed -i '' 's/SWIFT_VERSION = 5.0/SWIFT_VERSION = 6.0/g' "$f"
-            grep -q "SWIFT_STRICT_CONCURRENCY" "$f" || echo "SWIFT_STRICT_CONCURRENCY = off" >> "$f"
-          done
-          # Also patch the pbxproj for any settings not in xcconfig
-          ruby -e '
-          require "xcodeproj"
-          project = Xcodeproj::Project.open("ios/Pods/Pods.xcodeproj")
-          project.targets.each do |target|
-            target.build_configurations.each do |config|
-              config.build_settings["SWIFT_VERSION"] = "6.0"
-              config.build_settings["SWIFT_STRICT_CONCURRENCY"] = "off"
-              config.build_settings["OTHER_SWIFT_FLAGS"] = "$(inherited) -strict-concurrency=off"
-            end
-          end
-          project.save
-          '
-
       - name: Build unsigned .app
         run: |
           cd ios
