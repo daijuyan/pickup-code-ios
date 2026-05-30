@@ -1,0 +1,68 @@
+name: Build iOS IPA (Unsigned)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Detect scheme name
+        id: scheme
+        run: |
+          cd ios
+          SCHEME=$(xcodebuild -list -json | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          schemes=d.get('project',d.get('workspace',{})).get('schemes',[])
+          print(schemes[0] if schemes else 'PickupCode')
+          ")
+          echo "name=$SCHEME" >> $GITHUB_OUTPUT
+          echo "Detected scheme: $SCHEME"
+
+      - name: Build unsigned .app
+        run: |
+          xcodebuild \
+            -workspace ios/PickupCode.xcworkspace \
+            -scheme ${{ steps.scheme.outputs.name }} \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_BITCODE=NO \
+            DEVELOPMENT_TEAM=""
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r ios/build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r PickupCode-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PickupCode-unsigned
+          path: PickupCode-unsigned.ipa
+          retention-days: 30
