@@ -1,7 +1,7 @@
-name: Build iOS IPA (Unsigned)
+name: Build iOS IPA
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   build:
@@ -24,22 +24,16 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Debug: Print native config
+      - name: Debug native config
         run: |
           echo "=== AppDelegate ==="
-          cat ios/app/AppDelegate.mm || cat ios/app/AppDelegate.m || cat ios/app/AppDelegate.swift || echo "NOT FOUND"
+          cat ios/app/AppDelegate.mm 2>/dev/null || cat ios/app/AppDelegate.m 2>/dev/null || cat ios/app/AppDelegate.swift 2>/dev/null || echo "NOT FOUND"
           echo ""
           echo "=== Podfile ==="
           cat ios/Podfile
           echo ""
-          echo "=== iOS project files ==="
-          find ios/app -type f -name "*.mm" -o -name "*.m" -o -name "*.swift" -o -name "*.plist" | sort
-          echo ""
-          echo "=== Info.plist ==="
-          cat ios/app/Info.plist
-          echo ""
-          echo "=== Build Settings (Hermes) ==="
-          grep -r "hermes\|HERMES\|jsEngine\|USE_HERMES" ios/ --include="*.rb" --include="Podfile" --include="*.xcconfig" || echo "no hermes config found"
+          echo "=== iOS source files ==="
+          find ios/app -type f | sort
 
       - name: Install CocoaPods
         run: |
@@ -60,25 +54,16 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM=""
 
-      - name: Debug: Check built .app
+      - name: Debug built app
         run: |
-          echo "=== .app contents ==="
+          echo "=== .app files ==="
           find ios/build/Build/Products/Release-iphoneos/*.app -type f | head -30
           echo ""
           echo "=== Frameworks ==="
-          ls -la ios/build/Build/Products/Release-iphoneos/*.app/Frameworks/ 2>/dev/null || echo "No Frameworks dir"
+          ls -la ios/build/Build/Products/Release-iphoneos/*.app/Frameworks/ 2>/dev/null || echo "No Frameworks"
           echo ""
-          echo "=== main.jsbundle check ==="
-          xxd ios/build/Build/Products/Release-iphoneos/*.app/main.jsbundle 2>/dev/null | head -3 || echo "main.jsbundle NOT FOUND"
-          echo ""
-          echo "=== Expo.plist ==="
-          python3 -c "
-          import plistlib
-          with open('$(ls ios/build/Build/Products/Release-iphoneos/*.app/Expo.plist)', 'rb') as f:
-              data = plistlib.load(f)
-              for k, v in data.items():
-                  print(f'{k}: {v}')
-          " 2>/dev/null || echo "Expo.plist not found"
+          echo "=== main.jsbundle header ==="
+          xxd ios/build/Build/Products/Release-iphoneos/*.app/main.jsbundle 2>/dev/null | head -3 || echo "NOT FOUND"
 
       - name: Package IPA
         run: |
