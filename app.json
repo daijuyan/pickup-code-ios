@@ -7,7 +7,9 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.codex.pickupcode"
+      "bundleIdentifier": "com.codex.pickupcode",
+      "jsEngine": "jsc",
+      "newArchEnabled": false
     }
   }
 }
