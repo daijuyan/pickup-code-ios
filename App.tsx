@@ -1,98 +1,158 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export default function App() {
-  const [status, setStatus] = useState('加载中...');
-  const [details, setDetails] = useState<string[]>([]);
+// 全局错误捕获
+let globalErrors: string[] = [];
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  globalErrors.push(args.map(a => String(a)).join(' '));
+  originalConsoleError(...args);
+};
 
-  const log = (msg: string) => {
-    setDetails(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-  };
+// 捕获未处理的 JS 错误
+ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+  globalErrors.push(`[${isFatal ? 'FATAL' : 'ERROR'}] ${error?.message || String(error)}\n${error?.stack || ''}`);
+});
 
-  useEffect(() => {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  state = { hasError: false, error: '' };
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error: String(error?.message || error) };
+  }
+
+  componentDidCatch(error: any, info: any) {
+    globalErrors.push(`[Boundary] ${error?.message}\n${info?.componentStack}`);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.container}>
+          <Text style={styles.title}>组件错误</Text>
+          <Text style={styles.errorText}>{this.state.error}</Text>
+          <ScrollView style={styles.logBox}>
+            {globalErrors.map((e, i) => (
+              <Text key={i} style={styles.logText}>{e}</Text>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MainApp() {
+  const [errors, setErrors] = React.useState<string[]>([]);
+  const [loaded, setLoaded] = React.useState(false);
+
+  React.useEffect(() => {
     try {
-      log('App 启动成功');
-      log(`React 版本: ${React.version}`);
+      // 逐个测试模块加载
+      const testModules = async () => {
+        const results: string[] = [];
 
-      // Test AsyncStorage
-      (async () => {
         try {
           const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          await AsyncStorage.setItem('test', 'hello');
-          const val = await AsyncStorage.getItem('test');
-          log(`AsyncStorage 测试: ${val}`);
-          await AsyncStorage.removeItem('test');
+          results.push('AsyncStorage: OK');
         } catch (e: any) {
-          log(`AsyncStorage 错误: ${e.message}`);
+          results.push(`AsyncStorage FAIL: ${e.message}`);
         }
 
-        // Test Navigation
         try {
-          const nav = await import('@react-navigation/native');
-          log(`@react-navigation/native 加载成功`);
+          const { NavigationContainer } = await import('@react-navigation/native');
+          results.push('NavigationContainer: OK');
         } catch (e: any) {
-          log(`Navigation 加载错误: ${e.message}`);
+          results.push(`NavigationContainer FAIL: ${e.message}`);
         }
 
-        // Test Bottom Tabs
         try {
-          const tabs = await import('@react-navigation/bottom-tabs');
-          log(`@react-navigation/bottom-tabs 加载成功`);
+          const { createBottomTabNavigator } = await import('@react-navigation/bottom-tabs');
+          results.push('BottomTabs: OK');
         } catch (e: any) {
-          log(`Bottom Tabs 加载错误: ${e.message}`);
+          results.push(`BottomTabs FAIL: ${e.message}`);
         }
 
-        // Test Native Stack
         try {
-          const stack = await import('@react-navigation/native-stack');
-          log(`@react-navigation/native-stack 加载成功`);
+          const { createNativeStackNavigator } = await import('@react-navigation/native-stack');
+          results.push('NativeStack: OK');
         } catch (e: any) {
-          log(`Native Stack 加载错误: ${e.message}`);
+          results.push(`NativeStack FAIL: ${e.message}`);
         }
 
-        // Test SafeArea
         try {
-          const safe = await import('react-native-safe-area-context');
-          log(`safe-area-context 加载成功`);
+          const { SafeAreaProvider } = await import('react-native-safe-area-context');
+          results.push('SafeArea: OK');
         } catch (e: any) {
-          log(`SafeArea 加载错误: ${e.message}`);
+          results.push(`SafeArea FAIL: ${e.message}`);
         }
 
-        // Test Screens
         try {
-          const screens = await import('react-native-screens');
-          log(`react-native-screens 加载成功`);
+          require('react-native-screens');
+          results.push('Screens: OK');
         } catch (e: any) {
-          log(`Screens 加载错误: ${e.message}`);
+          results.push(`Screens FAIL: ${e.message}`);
         }
 
-        setStatus('所有模块测试完成');
-      })();
+        results.push(`\nReact: ${React.version}`);
+        results.push(`Time: ${new Date().toLocaleString()}`);
+        results.push(`Global errors: ${globalErrors.length}`);
+
+        if (globalErrors.length > 0) {
+          results.push('\n--- Global Errors ---');
+          results.push(...globalErrors.slice(-5));
+        }
+
+        setErrors(results);
+        setLoaded(true);
+      };
+
+      testModules();
     } catch (e: any) {
-      log(`启动错误: ${e.message}`);
-      setStatus('启动出错');
+      setErrors([`启动失败: ${e.message}`, String(e.stack)]);
+      setLoaded(true);
     }
   }, []);
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <Text style={styles.title}>快递取件码</Text>
-      <Text style={styles.status}>{status}</Text>
-      <ScrollView style={styles.logContainer}>
-        {details.map((d, i) => (
-          <Text key={i} style={styles.logText}>{d}</Text>
+      <Text style={styles.title}>快递取件码 - 诊断</Text>
+      <Text style={styles.subtitle}>
+        {loaded ? '诊断完成' : '正在检测...'}
+      </Text>
+      <ScrollView style={styles.logBox}>
+        {errors.map((e, i) => (
+          <Text key={i} style={[
+            styles.logText,
+            e.includes('FAIL') && styles.errorText,
+          ]}>
+            {e}
+          </Text>
         ))}
       </ScrollView>
     </View>
   );
 }
 
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 20, backgroundColor: '#F5F5F5' },
-  title: { fontSize: 24, fontWeight: '700', color: '#F57C00', marginBottom: 8 },
-  status: { fontSize: 16, color: '#333', marginBottom: 16, fontWeight: '600' },
-  logContainer: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 12 },
-  logText: { fontSize: 13, color: '#555', marginBottom: 6, fontFamily: 'Courier' },
+  title: { fontSize: 22, fontWeight: '700', color: '#F57C00', marginBottom: 4 },
+  subtitle: { fontSize: 15, color: '#333', marginBottom: 16 },
+  logBox: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 12 },
+  logText: { fontSize: 12, color: '#333', marginBottom: 6, fontFamily: 'Courier' },
+  errorText: { color: '#D32F2F', fontWeight: '600' },
 });
