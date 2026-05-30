@@ -4,33 +4,10 @@
     "slug": "pickup-code",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.codex.pickupcode"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "package": "com.codex.pickupcode"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "updates": {
-      "checkAutomatically": "NEVER",
-      "fallbackToCacheTimeout": 0
-    },
-    "extra": {
-      "eas": {
-        "projectId": "b4455fcd-0de9-4207-9764-220f1aa13493"
-      }
-    },
-    "owner": "daitangjun"
+    }
   }
 }
