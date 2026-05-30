@@ -29,6 +29,17 @@ jobs:
           cd ios
           pod install
 
+      - name: Patch Pods Swift version
+        run: |
+          # Update SWIFT_VERSION from 5.0 to 6.0 in Pods project
+          sed -i '' 's/SWIFT_VERSION = 5.0/SWIFT_VERSION = 6.0/g' ios/Pods/Pods.xcodeproj/project.pbxproj
+          # Add SWIFT_STRICT_CONCURRENCY = off to all build configurations
+          sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 6.0;\n\t\t\t\tSWIFT_STRICT_CONCURRENCY = off/g' ios/Pods/Pods.xcodeproj/project.pbxproj
+          # Also update app project if it has SWIFT_VERSION
+          if [ -f ios/app.xcodeproj/project.pbxproj ]; then
+            sed -i '' 's/SWIFT_VERSION = 5.0/SWIFT_VERSION = 6.0/g' ios/app.xcodeproj/project.pbxproj
+          fi
+
       - name: Build unsigned .app
         run: |
           cd ios
@@ -41,9 +52,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            SWIFT_VERSION=6.0 \
-            SWIFT_STRICT_CONCURRENCY=off
+            DEVELOPMENT_TEAM=""
 
       - name: Package IPA
         run: |
