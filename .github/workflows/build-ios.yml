@@ -24,24 +24,26 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Detect scheme name
-        id: scheme
+      - name: Detect workspace and scheme
+        id: detect
         run: |
           cd ios
-          SCHEME=$(xcodebuild -list -json | python3 -c "
+          WORKSPACE=$(ls *.xcworkspace 2>/dev/null | head -1)
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json 2>/dev/null | python3 -c "
           import json,sys
           d=json.load(sys.stdin)
-          schemes=d.get('project',d.get('workspace',{})).get('schemes',[])
-          print(schemes[0] if schemes else 'PickupCode')
-          ")
-          echo "name=$SCHEME" >> $GITHUB_OUTPUT
-          echo "Detected scheme: $SCHEME"
+          schemes=d.get('workspace',{}).get('schemes',[])
+          print(schemes[0] if schemes else 'app')
+          " 2>/dev/null || echo "app")
+          echo "workspace=$WORKSPACE" >> $GITHUB_OUTPUT
+          echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
+          echo "Workspace: $WORKSPACE, Scheme: $SCHEME"
 
       - name: Build unsigned .app
         run: |
           xcodebuild \
-            -workspace ios/PickupCode.xcworkspace \
-            -scheme ${{ steps.scheme.outputs.name }} \
+            -workspace "ios/${{ steps.detect.outputs.workspace }}" \
+            -scheme "${{ steps.detect.outputs.scheme }}" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath ios/build \
