@@ -29,16 +29,19 @@ jobs:
           cd ios
           pod install
 
-      - name: Patch Pods Swift version
+      - name: Patch Pods Swift settings
         run: |
-          # Update SWIFT_VERSION from 5.0 to 6.0 in Pods project
-          sed -i '' 's/SWIFT_VERSION = 5.0/SWIFT_VERSION = 6.0/g' ios/Pods/Pods.xcodeproj/project.pbxproj
-          # Add SWIFT_STRICT_CONCURRENCY = off to all build configurations
-          sed -i '' 's/SWIFT_VERSION = 6.0/SWIFT_VERSION = 6.0;\n\t\t\t\tSWIFT_STRICT_CONCURRENCY = off/g' ios/Pods/Pods.xcodeproj/project.pbxproj
-          # Also update app project if it has SWIFT_VERSION
-          if [ -f ios/app.xcodeproj/project.pbxproj ]; then
-            sed -i '' 's/SWIFT_VERSION = 5.0/SWIFT_VERSION = 6.0/g' ios/app.xcodeproj/project.pbxproj
-          fi
+          ruby -e '
+          require "xcodeproj"
+          project = Xcodeproj::Project.open("ios/Pods/Pods.xcodeproj")
+          project.targets.each do |target|
+            target.build_configurations.each do |config|
+              config.build_settings["SWIFT_VERSION"] = "6.0"
+              config.build_settings["SWIFT_STRICT_CONCURRENCY"] = "off"
+            end
+          end
+          project.save
+          '
 
       - name: Build unsigned .app
         run: |
